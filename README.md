@@ -263,3 +263,16 @@ git clone https://github.com/Naxisbeast/CMPG325-Kopano-Network.git
    * **Console Password:** `ConsolePass2026!`
    * **Privileged EXEC (`enable`):** `KopanoAdminPass`
    * **SSH Username / Secret:** `admin` / `Kopano@2026!`
+
+---
+
+## 7. Beyond-the-Brief Engineering Decisions
+
+Six deliberate decisions take this build beyond a minimum homework submission. Each is flagged 🟠 as a design decision throughout the repository documentation and makes a strong talking point for the video presentation.
+
+1. **Dedicated DHCP server host** — DHCP runs on `172.30.98.2` in VLAN 10 instead of on the router, so the router genuinely relays VLANs 20/30/40 via `ip helper-address`, stamping `giaddr` on each request.
+2. **Dedicated shared printer VLAN** — `Printer0` sits in its own VLAN 30 (`172.30.99.0/28`), so printer sharing crosses departments with clean ACLs and demonstrates physical-to-logical separation (cabled on `SW-ADMIN` physically, VLAN 30 logically).
+3. **Granular Layer 4 protocol filtering** — ACL 102 targets only the high-risk file-sharing ports FTP (TCP 21) and SMB (TCP 445), leaving ICMP, management, and printer traffic open across departments.
+4. **WRT300N as a pure Layer 2 bridge** — the consumer router's WAN port is bypassed (uplink on a LAN port), internal DHCP is disabled, and `Kopano-Core-SW1` handles 802.1Q tagging, avoiding the device's default double-NAT/routing behaviour.
+5. **Outbound NAT/PAT** — internal `172.30.98.0/23` is overloaded onto the simulated public WAN `203.0.113.1` (ISP upstream `.2`, DNS `8.8.8.8`), giving all VLANs and contractors realistic internet routing.
+6. **Extended star / hierarchical topology** — core `Kopano-Core-SW1` feeds access `SW-ADMIN`/`SW-TECH` over defined 802.1Q trunks, separating broadcast domains across wiring closets instead of a single flat switch.

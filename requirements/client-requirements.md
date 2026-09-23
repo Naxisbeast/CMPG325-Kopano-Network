@@ -40,6 +40,21 @@ Every design decision in this project traces to one of three sources:
 | 12 | Employee counts, existing infrastructure, departmental structure, budget | Not stated in brief | No basis for exact figures | Explicitly left undefined; where a number is needed for subnet sizing, a conservative planning assumption is stated inline and flagged 🟠 |
 | 13 | Comparable South African ISP offices commonly separate administrative and technical/NOC functions | 🟡 Industry-supported | Supports the two-department model chosen in #2 | Used only as supporting rationale, not as a factual claim about Kopano itself |
 
+### Requirement Compliance Summary
+
+The implementation satisfies every requirement from the CMPG325-2026-147 brief and CR14:
+
+| Brief Requirement | Implemented Solution | Evidence |
+|---|---|---|
+| Multi-VLAN architecture (§7, §9) | 4 VLANs: Admin (10), Technical (20), Printers (30), Contractor (40) | README §2; `topology/logical-topology.md` §1 |
+| VLSM subnetting (§6, §16) | `172.30.98.0/23` split into two /25s (departments) and two /28s (Printers/Contractor) | `addressing/ip-addressing-plan.md` §2 |
+| Department isolation & shared printers (§8) | ACL 102 permits VLAN 30 (Printers) for both departments and blocks FTP/SMB file-sharing between Admin and Technical | README §3B; `topology/logical-topology.md` §3 |
+| Scoped multi-VLAN DHCP & relay (§9) | Central DHCP server `172.30.98.2` (VLAN 10); `ip helper-address` relay on sub-interfaces Gi0/0.10–.40 | README §3A; `addressing/ip-addressing-plan.md` §4 |
+| IP exclusions & reservations (§9) | Gateway addresses excluded from every pool; printer address held via MAC reservation | `addressing/ip-addressing-plan.md` §3 |
+| Contractor wireless segment (§10 / CR14) | VLAN 40 via WRT300N (Layer 2 bridge); ACL 100 restricts contractor access to the Admin server (`172.30.98.2`) | README §3B; `topology/physical-topology.md` §6 |
+| Deliberate configuration fault (§9) | `ip helper-address` removed from Gi0/0.20 → VLAN 20 DHCP failure (APIPA `169.254.x.x`), then restored | README §4 |
+| Negative verification testing (§9, §11) | TEST-04 documents blocked FTP between Admin and Technical with ACL 102 match hits (24 registered) | README §5 |
+
 ## 4. Client Problem Statement
 
 Kopano requires a segmented telecommunications-office network that provides controlled
