@@ -6,7 +6,7 @@
 Each VLAN is its own Layer 2 broadcast domain: a frame broadcast inside VLAN 10 never
 reaches a device in VLAN 20, 30, or 40, even though they may share the same physical
 switches. With four VLANs, that means four separate broadcast domains, and any traffic
-that needs to move between them has to pass up to Layer 3 and be routed by R1. This is the
+that needs to move between them has to pass up to Layer 3 and be routed by Kopano-Edge-R1. This is the
 concept that ties the whole design together: it's why inter-VLAN traffic needs a router in
 the first place, why the ACL policy below lives at Layer 3, and why DHCP, which starts as a
 Layer 2 broadcast, needs relay to cross those same boundaries.
@@ -22,12 +22,12 @@ Layer 2 broadcast, needs relay to cross those same boundaries.
 
 ```mermaid
 graph TD
-    R1["Layer 3, Router R1"]
+    Kopano-Edge-R1["Layer 3, Router Kopano-Edge-R1"]
 
-    R1 --> V10["VLAN 10, Admin<br/>172.30.98.0/25<br/>GW: .1"]
-    R1 --> V20["VLAN 20, Technical<br/>172.30.98.128/25<br/>GW: .129"]
-    R1 --> V30["VLAN 30, Printers<br/>172.30.99.0/28<br/>GW: .1"]
-    R1 --> V40["VLAN 40, Contractor<br/>172.30.99.16/28<br/>GW: .17"]
+    Kopano-Edge-R1 --> V10["VLAN 10, Admin<br/>172.30.98.0/25<br/>GW: .1"]
+    Kopano-Edge-R1 --> V20["VLAN 20, Technical<br/>172.30.98.128/25<br/>GW: .129"]
+    Kopano-Edge-R1 --> V30["VLAN 30, Printers<br/>172.30.99.0/28<br/>GW: .1"]
+    Kopano-Edge-R1 --> V40["VLAN 40, Contractor<br/>172.30.99.16/28<br/>GW: .17"]
 
     V10 --> D10["DHCP Server, local"]
     V20 --> D20["DHCP Scope 20, relayed"]
@@ -45,10 +45,11 @@ graph TD
 This is the core technical demonstration required by the brief's constraint (§8) and
 change request (§10). Because the router routes between VLANs at Layer 3, the access
 control here has to be an extended ACL, not a standard one: a standard ACL can only match
-on source address, which isn't enough to permit Admin and Technical to reach the Printer
-VLAN while still denying them from reaching each other. An extended ACL can match on
-source, destination, protocol, and port, which is what lets me express "permit to this one
-destination, deny to that one" as distinct rules on the same router interface.
+on source address, which isn't enough to block file-sharing between Admin and Technical
+while still letting printer, ICMP, and Internet traffic flow between the same subnets. An
+extended ACL can match on source, destination, protocol, and port, which is what lets me
+express "deny FTP/SMB between these two subnets, permit everything else" as distinct rules
+on the same router interface.
 
 ```mermaid
 graph LR
@@ -56,24 +57,26 @@ graph LR
     Tech["VLAN 20<br/>Technical"]
     Printers["VLAN 30<br/>Printers"]
     Contractor["VLAN 40<br/>Contractor"]
+    AdminSrv["Admin Server<br/>172.30.98.2"]
     Internet(["Internet / WAN"])
 
     Admin -->|ALLOW| Printers
     Tech -->|ALLOW| Printers
-    Admin -.->|DENY: file sharing| Tech
-    Tech -.->|DENY: file sharing| Admin
+    Admin -->|ALLOW| Internet
+    Tech -->|ALLOW| Internet
+    Admin -.->|DENY: FTP/SMB| Tech
+    Tech -.->|DENY: FTP/SMB| Admin
     Contractor -->|ALLOW| Internet
-    Contractor -.->|DENY| Admin
-    Contractor -.->|DENY| Tech
+    Contractor -.->|DENY: host 172.30.98.2| AdminSrv
 
     style Admin fill:#dcfce7
     style Tech fill:#fef3c7
     style Printers fill:#fce7f3
     style Contractor fill:#fee2e2
-    linkStyle 2 stroke:#dc2626,stroke-width:2px
-    linkStyle 3 stroke:#dc2626,stroke-width:2px
+    style AdminSrv fill:#dcfce7
+    linkStyle 4 stroke:#dc2626,stroke-width:2px
     linkStyle 5 stroke:#dc2626,stroke-width:2px
-    linkStyle 6 stroke:#dc2626,stroke-width:2px
+    linkStyle 7 stroke:#dc2626,stroke-width:2px
 ```
 
 *(Solid arrows are permitted; dashed red arrows are denied.)*
@@ -82,18 +85,29 @@ graph LR
 |---|---|---|---|---|
 | 1 | VLAN 10 (Admin) | VLAN 30 (Printers) | Permit | 🟢 Brief §8, printer sharing must cross departments |
 | 2 | VLAN 20 (Technical) | VLAN 30 (Printers) | Permit | 🟢 Brief §8, printer sharing must cross departments |
-| 3 | VLAN 10 (Admin) | VLAN 20 (Technical) | Deny | 🟢 Brief §8, file sharing must not cross departments |
-| 4 | VLAN 20 (Technical) | VLAN 10 (Admin) | Deny | 🟢 Brief §8, file sharing must not cross departments |
-| 5 | VLAN 40 (Contractor) | VLAN 10, VLAN 20 | Deny | 🟠 My interpretation of CR14's "limited access, preserving segmentation" (Brief §10); the brief requires limited access but doesn't spell out this exact rule |
-| 6 | VLAN 40 (Contractor) | Internet / WAN | Permit | 🟠 Design decision, my minimum viable interpretation of "limited access" for after-hours contractor use |
-| n/a | Any | Any (not matched above) | Implicit Deny | Least-privilege default |
+| 3 | VLAN 10 (Admin) | VLAN 20 (Technical), TCP 21 (FTP) / TCP 445 (SMB) | Deny | 🟠 ACL 102 targets file-sharing protocols specifically, satisfying Brief §8's "file sharing must not cross departments" |
+| 4 | VLAN 20 (Technical) | VLAN 10 (Admin), TCP 21 (FTP) / TCP 445 (SMB) | Deny | 🟠 ACL 102 targets file-sharing protocols specifically, satisfying Brief §8's "file sharing must not cross departments" |
+| 5 | VLAN 10 (Admin) | VLAN 20 (Technical), all other traffic | Permit | 🟡 Explicit `permit ip any any` tail of ACL 102; ICMP, management, and Internet stay reachable across departments |
+| 6 | VLAN 20 (Technical) | VLAN 10 (Admin), all other traffic | Permit | 🟡 Explicit `permit ip any any` tail of ACL 102; ICMP, management, and Internet stay reachable across departments |
+| 7 | VLAN 40 (Contractor) | 172.30.98.2 (Admin server host) | Deny | 🟠 My interpretation of CR14's "limited access, preserving segmentation" (Brief §10); blocks only the sensitive server host, not the whole Admin/Technical subnets |
+| 8 | VLAN 40 (Contractor) | Any other destination, incl. Internet / WAN | Permit | 🟠 Design decision, my minimum viable interpretation of "limited access" for after-hours contractor use |
+| n/a | Any | Any (not matched above) | Permit (explicit tail) | Both ACLs close with `permit ip any any`, shadowing the implicit-deny default; only the deny rules above actually restrict traffic |
 
-**Note on scope:** whether contractors should also reach the Printer VLAN isn't stated
-explicitly in the brief. 🟠 Design decision: I've limited contractor access to internet
-only, since cleaning and security contractors have no stated printing need, and the
-brief's own phrase, "limited access required by the scenario," favours the narrower
-interpretation. I'm flagging this so it can be revisited if the module handbook specifies
-otherwise.
+> **Design Scope Note (🟠):** *File-sharing isolation between Admin (VLAN 10) and Technical
+> (VLAN 20) is enforced specifically against the high-risk storage protocols (FTP on TCP 21
+> and SMB on TCP 445). Standard management traffic and ICMP remain permitted across
+> departments.*
+
+**Note on scope:** the brief's phrase "limited access required by the scenario" (CR14) is
+deliberately broad, and the implemented ACL 100 reads it narrowly: contractors are blocked
+only from the Admin server host (`172.30.98.2`), and are otherwise permitted — including
+printer and Internet access — because the cleaning/security contractor has no legitimate
+need to reach the central server, while walling off every departmental subnet would also
+cut legitimate printing and browsing. 🟠 Design decision: this is one defensible reading
+of "limited access"; if the module handbook expects contractors to be isolated from the
+departmental subnets entirely, the deny in ACL 100 can be widened to the whole
+`172.30.98.0/25` block without changing the policy structure. I'm flagging this so it can
+be revisited.
 
 ## 4. DHCP Logical Flow
 
@@ -106,11 +120,11 @@ subnet and doesn't need relay at all.
 ```mermaid
 sequenceDiagram
     participant C as Client (VLAN 20, 30, or 40)
-    participant R as Router R1<br/>(sub-interface with ip helper-address)
+    participant R as Router Kopano-Edge-R1<br/>(sub-interface with ip helper-address)
     participant D as DHCP Server<br/>(172.30.98.2, VLAN 10)
 
     C->>R: DHCPDISCOVER (Layer 2 broadcast, confined to its own VLAN)
-    R->>D: Relayed as unicast<br/>giaddr = R1's sub-interface address for that VLAN
+    R->>D: Relayed as unicast<br/>giaddr = Kopano-Edge-R1's sub-interface address for that VLAN
     D->>D: Reads giaddr, matches it to the correct DHCP scope
     D->>R: DHCPOFFER (from the matching scope)
     R->>C: Forwarded to the client
@@ -127,7 +141,7 @@ relay step to populate giaddr in the first place. I'm stating this explicitly be
 rest of this document only describes the relayed case, which could read as if giaddr is the
 only mechanism DHCP scope-matching ever uses. It isn't.
 
-Without `ip helper-address` configured on R1's VLAN 20 sub-interface, the DHCPDISCOVER
+Without `ip helper-address` configured on Kopano-Edge-R1's VLAN 20 sub-interface, the DHCPDISCOVER
 broadcast in the diagram above would never leave VLAN 20's broadcast domain, and the DHCP
 server would never see it. That's precisely why relay is required to satisfy Brief §9's
 demand for DHCP "across VLAN boundaries using an appropriate relay/routing arrangement,"

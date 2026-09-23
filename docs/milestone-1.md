@@ -2,6 +2,14 @@
 **Project:** CMPG325-2026-147 | **Client:** Kopano Fibre & Wireless ISP (Mahikeng)
 **Student:** Wana, Kamo (52060586) | **Due:** 28 August 2026
 
+> **STATUS — UPDATED 23 September 2026:** Milestone 1 (this design review) is complete, and
+> the implementation phase that followed is now fully done in this repository: the Packet
+> Tracer build, device configuration, security policy, deliberate-fault troubleshooting, and
+> the full test/verification matrix are all in place. See [`README.md`](../README.md) §3
+> (configs), §4 (troubleshooting), and §5 (test matrix), and open
+> [`packet-tracer/Kopano_Network_Topology.pkt`](../packet-tracer/Kopano_Network_Topology.pkt)
+> in Cisco Packet Tracer.
+
 ## Purpose
 
 This milestone answers one question: if Kopano Fibre & Wireless ISP hired me as a network
@@ -67,12 +75,26 @@ brief, and I haven't invented them. Where a planning number was needed, for exam
 sizing for Admin and Technical, I've stated and labelled the assumption in the addressing
 plan rather than presenting it as fact.
 
-## Next Steps (Post-Milestone-1)
+## Implementation Status (Completed)
 
-1. Build the topology in Cisco Packet Tracer.
-2. Configure VLANs, trunking, router sub-interfaces, and the DHCP server's scopes.
-3. Configure and verify `ip helper-address` relay on the VLAN 20, 30, and 40 sub-interfaces.
-4. Implement and test the ACL policy above, including at least one negative test.
-5. Introduce the planned fault (remove `ip helper-address` from R1's VLAN 20
-   sub-interface), document the diagnosis, then resolve it with evidence.
-6. Capture verification evidence: DHCP leases, scope info, gateway settings, ACL behaviour.
+Every post-Milestone-1 implementation step is now complete and evidenced in this
+repository. Each previously planned step maps to a finished item below.
+
+1. ✓ Build the topology in Cisco Packet Tracer. → Live build:
+   [`packet-tracer/Kopano_Network_Topology.pkt`](../packet-tracer/Kopano_Network_Topology.pkt).
+2. ✓ Configure VLANs, trunking, router sub-interfaces, and the DHCP server's scopes. →
+   Embedded in the `.pkt`; see [`README.md`](../README.md) §3 (core technical
+   implementation & configurations).
+3. ✓ Configure and verify `ip helper-address` relay on the VLAN 20, 30, and 40
+   sub-interfaces. → [`README.md`](../README.md) §3.A; relay verified end-to-end by
+   TEST-01 (scoped DHCP lease) in the test matrix (§5).
+4. ✓ Implement and test the ACL policy above, including at least one negative test. →
+   [`README.md`](../README.md) §3.B; the negative tests are TEST-04 (FTP block) and
+   TEST-05 (guest Wi-Fi server block) in the test matrix (§5).
+5. ✓ Introduce the planned fault (remove `ip helper-address` from `Kopano-Edge-R1`'s
+   Gi0/0.20 sub-interface), document the diagnosis, then resolve it with evidence. → Deliberate
+   fault (removal of `ip helper-address` from `Gi0/0.20`) induced, diagnosed, and resolved;
+   full log in [`README.md`](../README.md) §4.
+6. ✓ Capture verification evidence: DHCP leases, scope info, gateway settings, ACL
+   behaviour. → Screenshot evidence TEST-01..TEST-06 in [`assets/`](../assets/), indexed in
+   the test matrix ([`README.md`](../README.md) §5).

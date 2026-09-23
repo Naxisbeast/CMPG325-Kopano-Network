@@ -22,7 +22,7 @@ actually destined for. That's why star wiring around a switch, not a bus around 
 cable, is the sensible physical building block here.
 
 I then take that building block and repeat it one level up: the access switches (SW-ADMIN,
-SW-TECH, the AP) each form their own star around their connected end devices, and those
+SW-TECH, and the WRT300N AP) each form their own star around their connected end devices, and those
 switches connect back to one central point, the core switch, which connects up to the
 router. A star built out of stars like this is a hierarchical or tree topology, and it's
 sometimes called a hybrid topology since it combines the star pattern at two levels. That
@@ -48,7 +48,7 @@ more precise term is the one I use in the diagram section below.
   extended star design below is made from.
 
 **Why extended star fits this project:** it isolates a fault to one branch, so a failure on
-SW-TECH doesn't take down Admin or the AP; it gives each department its own physical access
+SW-TECH doesn't take down Admin or the WRT300N AP; it gives each department its own physical access
 point that maps cleanly onto its VLAN; and it's the standard real-world choice for exactly
 this kind of segmented office LAN.
 
@@ -61,31 +61,32 @@ was deliberate for this brief, not the only topology that could ever apply.
 
 ## 3. Link Types
 
-Every wired link in this design (R1 to SW-CORE, SW-CORE to each access switch, access
+Every wired link in this design (Kopano-Edge-R1 to Kopano-Core-SW1, Kopano-Core-SW1 to each access switch, access
 switches to end devices and the printer) is standard Gigabit Ethernet copper, which is more
 than sufficient for an office of this size and is the default Packet Tracer link type for
 these device classes. 🟠 Design decision, since the brief doesn't specify link speeds; I'm
 stating it here so the physical topology is fully specified rather than leaving cabling
-implicit. The contractor segment is wireless by requirement (CR14), using the AP's default
+implicit. The contractor segment is wireless by requirement (CR14), using the WRT300N's default
 802.11 configuration.
 
 ## 4. Devices
 
 | Device | Role | Justification |
 |---|---|---|
-| 1x Router | Inter-VLAN routing (router-on-a-stick), DHCP relay agent, NAT/PAT for internet-bound traffic | A single router-on-a-stick is sufficient for 4 VLANs; a Layer 3 switch would add capability this project's scale doesn't require, so I kept it simple, matching the rubric's "appropriate" rather than "maximal" |
-| 1x Core/Distribution Switch | Trunk aggregation from access switches and AP to the router | Central point for 802.1Q trunks |
-| 2x Access Switches | Access-layer connectivity for Admin and Technical end devices, and the shared printer | One per department keeps the physical wiring-closet story simple and traceable to the VLAN plan |
-| 1x Wireless Access Point | Contractor Wi-Fi (CR14) | Explicitly required: "dedicated limited-access wireless segment" (Brief §9) |
-| PCs | End-user devices, Admin and Technical | Represent departmental staff |
-| 1x Network Printer | Shared print device | Central to the printer-sharing requirement (Brief §8) |
-| 1x DHCP Server | Hosts the DHCP service, placed in VLAN 10 (Admin) | 🟠 Design decision: I moved DHCP off the router and onto a dedicated server so that relay is genuinely required for VLANs 20, 30, and 40, which is what the brief's technical challenge actually asks me to demonstrate. See `addressing/ip-addressing-plan.md` §4 for the full reasoning. |
+| 1x Router (Kopano-Edge-R1) | Inter-VLAN routing (router-on-a-stick), DHCP relay agent, NAT/PAT for internet-bound traffic | A single router-on-a-stick is sufficient for 4 VLANs; a Layer 3 switch would add capability this project's scale doesn't require, so I kept it simple, matching the rubric's "appropriate" rather than "maximal" |
+| 1x Core/Distribution Switch (Kopano-Core-SW1) | Trunk aggregation from access switches and AP to the router | Central point for 802.1Q trunks |
+| 2x Access Switches (SW-ADMIN, SW-TECH) | Access-layer connectivity for Admin and Technical end devices, and the shared printer | One per department keeps the physical wiring-closet story simple and traceable to the VLAN plan |
+| 1x Wireless Access Point (WRT300N, L2-bridged) | Contractor Wi-Fi (CR14) | Explicitly required: "dedicated limited-access wireless segment" (Brief §9) |
+| PCs (PC0-PC2 Admin, PC3-PC5 Technical) | End-user devices, Admin and Technical | Represent departmental staff |
+| 1x Network Printer (Printer0) | Shared print device | Central to the printer-sharing requirement (Brief §8) |
+| 1x DHCP Server (172.30.98.2) | Hosts the DHCP service, placed in VLAN 10 (Admin) | 🟠 Design decision: I moved DHCP off the router and onto a dedicated server so that relay is genuinely required for VLANs 20, 30, and 40, which is what the brief's technical challenge actually asks me to demonstrate. See `addressing/ip-addressing-plan.md` §4 for the full reasoning. |
 
 **On NAT/PAT:** the ACL policy permits contractor devices to reach the internet, and every
 VLAN's clients will need internet access for normal operation. Since 172.30.x.x is private
 address space, none of it is routable on the public internet, so the router performs NAT
-(specifically PAT, Port Address Translation, overloading one public IP for all internal
-hosts) on its WAN-facing interface for traffic leaving the network. This isn't part of the
+(specifically PAT, Port Address Translation, overloading the internal 172.30.98.0/23 block
+onto the single public address 203.0.113.1) on its WAN-facing interface for traffic leaving
+the network. This isn't part of the
 assigned technical challenge, but it's necessary for the design to actually work end to end,
 so I'm stating it here rather than leaving it implicit.
 
@@ -93,17 +94,17 @@ so I'm stating it here rather than leaving it implicit.
 
 ```mermaid
 graph TD
-    WAN["ISP / WAN Uplink"] --> R1["Router R1<br/>Router-on-a-Stick<br/>DHCP relay + NAT/PAT"]
-    R1 --> CORE["Core Switch<br/>SW-CORE"]
+    WAN["ISP / WAN Uplink<br/>203.0.113.0/30<br/>ISP-Upstream .2 / DNS 8.8.8.8"] --> R1["Kopano-Edge-R1<br/>Router-on-a-Stick<br/>DHCP relay + NAT/PAT<br/>203.0.113.1"]
+    R1 --> CORE["Kopano-Core-SW1"]
     CORE --> SWADMIN["Access Switch<br/>SW-ADMIN"]
     CORE --> SWTECH["Access Switch<br/>SW-TECH"]
-    CORE --> AP["Wireless AP<br/>Contractor Wi-Fi"]
+    CORE --> AP["WRT300N Wireless AP<br/>(L2 bridge)<br/>Contractor Wi-Fi"]
 
-    SWADMIN --> AdminPCs["Admin PCs<br/>VLAN 10"]
-    SWADMIN --> DHCPServer["DHCP Server<br/>VLAN 10, .2"]
-    SWADMIN --> Printer["Shared Printer<br/>VLAN 30"]
-    SWTECH --> TechPCs["Technical PCs<br/>VLAN 20"]
-    AP --> Contractors["Contractor Devices<br/>VLAN 40"]
+    SWADMIN --> AdminPCs["Admin PCs PC0-PC2<br/>VLAN 10"]
+    SWADMIN --> DHCPServer["DHCP Server 172.30.98.2<br/>VLAN 10"]
+    SWADMIN --> Printer["Printer0 172.30.99.2<br/>VLAN 30"]
+    SWTECH --> TechPCs["Technical PCs PC3-PC5<br/>VLAN 20"]
+    AP --> Contractors["Laptop1-Laptop2<br/>VLAN 40"]
 
     style R1 fill:#dbeafe
     style CORE fill:#dbeafe
@@ -117,21 +118,28 @@ graph TD
 *(ASCII version below for quick reference outside GitHub's renderer.)*
 
 ```
-                              ISP / WAN Uplink
+                          ISP / WAN Uplink
+                    (203.0.113.0/30, ISP-Upstream .2,
+                     external DNS 8.8.8.8)
                                     |
-                              [ Router R1 ]
-                              (Router-on-a-Stick,
-                               DHCP relay, NAT/PAT)
+                          [ Kopano-Edge-R1 ]
+                          (Router-on-a-Stick, DHCP relay,
+                           NAT/PAT outbound to 203.0.113.1)
                                     |
-                           [ Core Switch SW-CORE ]
+                           [ Kopano-Core-SW1 ]
                                     |
               ┌─────────────────────┼─────────────────────┐
               |                     |                     |
-     [ Access SW-ADMIN ]   [ Access SW-TECH ]      [ Wireless AP ]
-        |    |     |            |         |              |
-    Admin  DHCP  Printer    Tech PCs   (nothing else)  Contractor
-    PCs   Server (VLAN 30)  (VLAN 20)                   devices
-  (VLAN 10)(VLAN 10)                                    (VLAN 40)
+       [ SW-ADMIN ]          [ SW-TECH ]          [ WRT300N ]
+          |    |    |            |    |              (L2 bridge)
+       PC0-PC2  DHCP         PC3-PC5               Laptop1
+       (Admin,  Server        (Tech,                Laptop2
+        VLAN 10) 172.30.98.2   VLAN 20)              (VLAN 40)
+                  (VLAN 10)
+          |
+       Printer0
+       172.30.99.2
+         (VLAN 30)
 ```
 
 Both the printer and the DHCP server plug into the SW-ADMIN access switch physically, but
@@ -147,19 +155,23 @@ per-exception rules bolted onto each department's VLAN.
 
 | Link | Type | VLANs Carried |
 |---|---|---|
-| R1 to SW-CORE | Trunk (802.1Q) | 10, 20, 30, 40 |
-| SW-CORE to SW-ADMIN | Trunk | 10, 30 |
-| SW-CORE to SW-TECH | Trunk | 20, 30 |
-| SW-CORE to AP | Access | 40 |
-| SW-ADMIN to Admin PCs | Access | 10 |
-| SW-ADMIN to DHCP Server | Access | 10 |
-| SW-ADMIN to Printer | Access | 30 |
-| SW-TECH to Tech PCs | Access | 20 |
+| Kopano-Edge-R1 to Kopano-Core-SW1 | Trunk (802.1Q) | 10, 20, 30, 40 |
+| Kopano-Core-SW1 to SW-ADMIN | Trunk | 10, 30 |
+| Kopano-Core-SW1 to SW-TECH | Trunk | 20 |
+| Kopano-Core-SW1 to WRT300N | Access | 40 |
+| SW-ADMIN to Admin PCs (PC0-PC2) | Access | 10 |
+| SW-ADMIN to DHCP Server (172.30.98.2) | Access | 10 |
+| SW-ADMIN to Printer0 (172.30.99.2) | Access | 30 |
+| SW-TECH to Technical PCs (PC3-PC5) | Access | 20 |
 
-I made the SW-CORE-to-AP link an access port rather than a trunk, deliberately. The AP
-carries exactly one VLAN (VLAN 40, confirmed in the logical topology, where it's the only
-scope relayed to the AP), so trunking here would tag every frame with a VLAN ID that can
-only ever take one value, which is functionally pointless. Every other trunk in this table
-exists because it carries multiple VLANs: R1 to SW-CORE carries all four, SW-CORE to
-SW-ADMIN carries 10 and 30, and SW-CORE to SW-TECH carries 20 and 30. That contrast is the
-point: multiple VLANs on a link means a trunk; a single VLAN means an access port.
+I made the Kopano-Core-SW1-to-WRT300N link an access port rather than a trunk, deliberately.
+The WRT300N carries exactly one VLAN (VLAN 40, confirmed in the logical topology, where it's
+the only scope relayed to the AP), so trunking here would tag every frame with a VLAN ID
+that can only ever take one value, which is functionally pointless. The access-switch
+uplinks, by contrast, are all 802.1Q trunks: Kopano-Edge-R1 to Kopano-Core-SW1 carries all
+four VLANs, Kopano-Core-SW1 to SW-ADMIN carries 10 and 30, and Kopano-Core-SW1 to SW-TECH
+carries only 20, since SW-TECH hosts nothing but the Technical PCs (VLAN 20). Keeping
+SW-TECH's uplink trunked is deliberate even though it needs only one VLAN today, so adding a
+VLAN to that closet later wouldn't require a port-mode change. The contrast that motivated
+the access port is unchanged: a link carrying exactly one VLAN gains nothing from 802.1Q
+tagging; a link carrying several VLANs requires it.

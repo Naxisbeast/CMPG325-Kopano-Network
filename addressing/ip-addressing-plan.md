@@ -86,12 +86,19 @@ placed in VLAN 10 (Admin), at 172.30.98.2 (excluded from that VLAN's own pool, a
 other VLAN now genuinely needs relay to reach it, which is what the brief is actually
 asking me to demonstrate.
 
+The running build matches this arrangement on `Kopano-Edge-R1`: all four 802.1Q
+sub-interfaces (Gi0/0.10, Gi0/0.20, Gi0/0.30, Gi0/0.40) carry `ip helper-address
+172.30.98.2`. On Gi0/0.10 that statement is locally redundant — the DHCP server shares
+VLAN 10's broadcast domain, so the server receives local DISCOVERs without any relay — but
+I kept it on so the CLI shows a uniform relay config on every sub-interface and a marker
+inspecting the build sees the same line they'd expect from README §3A.
+
 | Sub-interface | VLAN | `ip helper-address` target |
 |---|---|---|
-| R1.10 | 10 | Not required, DHCP server is local to this VLAN |
-| R1.20 | 20 | 172.30.98.2 |
-| R1.30 | 30 | 172.30.98.2 |
-| R1.40 | 40 | 172.30.98.2 |
+| Gi0/0.10 | 10 | 172.30.98.2 (present in the build; locally redundant — server shares this VLAN) |
+| Gi0/0.20 | 20 | 172.30.98.2 |
+| Gi0/0.30 | 30 | 172.30.98.2 |
+| Gi0/0.40 | 40 | 172.30.98.2 |
 
 One thing I can be asked about in the defence: `ip helper-address` on a Cisco router relays
 more than just DHCP by default. It forwards the standard set of UDP broadcast services,
@@ -99,7 +106,8 @@ including DHCP and TFTP, unless that list is trimmed with `ip forward-protocol`.
 design only DHCP relay is actually being used and tested, but I can name this default
 behaviour if asked what else `ip helper-address` forwards.
 
-This also gives me a clean, honest fault to introduce for the required troubleshooting
-cycle (Brief §9): removing the `ip helper-address` line from R1.20 produces a fault where
-VLAN 20 clients get no address at all while VLAN 10 and the other relayed VLANs keep
-working, which is easy to diagnose and easy to explain on camera.
+This is also the deliberate fault I executed for the required troubleshooting cycle (Brief
+§9): removing the `ip helper-address` line from the Gi0/0.20 sub-interface on
+`Kopano-Edge-R1` produces a fault where VLAN 20 clients get no address at all while VLAN 10
+and the other relayed VLANs keep working. The fault was induced, diagnosed, and resolved —
+see README §4 for the official troubleshooting log.
