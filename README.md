@@ -4,7 +4,7 @@
 ![Security](https://img.shields.io/badge/Security-SSHv2%20%7C%20ACLs%20%7C%20AAA-green?style=flat-square)
 ![Academic Project](https://img.shields.io/badge/CMPG325-North--West%20University-blueviolet?style=flat-square)
 
-An enterprise-grade campus network architecture designed and implemented for **Kopano Fibre & Wireless ISP** (Mahikeng Operations). Built within Cisco Packet Tracer as part of the CMPG 325 curriculum, this repository contains the live network topology (`.pkt`), the full device configuration embedded in that build, the security policy set, and a verified test/evidence matrix with supporting screenshots.
+This is my CMPG 325 individual project for **Kopano Fibre & Wireless ISP** (Mahikeng) — a segmented office network I designed and built in Cisco Packet Tracer. The repository holds the live topology (`.pkt`), the device configuration built into it, the security policies, and a test/evidence matrix with screenshots showing it works.
 
 ## Repository Structure
 
@@ -23,21 +23,21 @@ CMPG325-Kopano-Network/
 
 ## 1. Executive Summary
 
-The Kopano ISP network provides segmented, highly secure, and resilient connectivity across administrative, technical, printing, and guest/contractor wireless operational units. The design enforces strict departmental isolation, centralized network services (DHCP, DNS), dynamic Network Address Translation (NAT Overload), and enterprise-level management security (SSH v2, encrypted AAA authentication, and legal banners).
+I split the Kopano network into four segments — administrative, technical, printing, and guest/contractor wireless — so departments stay isolated from each other while still sharing the services they need. The core of what I built: strict access control between departments, one central DHCP/DNS service, NAT (PAT) out to the internet, and hardened device management (SSHv2, encrypted secrets, and a legal login banner).
 
 ### Key Architectural Highlights
 
-* **Router-on-a-Stick (ROAS):** IEEE 802.1Q sub-interface routing on `Kopano-Edge-R1` driving inter-VLAN communications.
-* **Centralized Scoped DHCP Relay:** Multi-subnet IP pool assignment managed by a dedicated Admin DHCP Server (`172.30.98.2`) using `ip helper-address`.
-* **Granular Access Security:** Extended ACL 102 filtering Layer 4 file-sharing protocols (FTP/SMB) between departments while maintaining shared printer access and Internet routing.
-* **Perimeter NAT Overload:** Dynamic Port Address Translation (PAT) mapping internal private subnets (`172.30.98.0/23`) to public WAN interfaces (`203.0.113.1`).
-* **Device Hardening:** Standardized hostnames, 1024-bit RSA key generation, SSH v2 enforcement, line timeouts, password encryption, and MOTD authorization banners.
+* **Router-on-a-Stick (ROAS):** I routed between the VLANs with 802.1Q sub-interfaces on `Kopano-Edge-R1`, so one physical trunk carries all four networks.
+* **Centralized Scoped DHCP Relay:** One dedicated DHCP server (`172.30.98.2`) hands out per-subnet pools, and I relayed every VLAN to it with `ip helper-address`.
+* **Granular Access Security:** I used extended ACL 102 to block the risky file-sharing protocols (FTP/SMB) between departments while still letting them share the printer and reach the internet.
+* **Perimeter NAT Overload:** The private `172.30.98.0/23` space is PAT'd out the WAN interface `203.0.113.1`, so all internal hosts share one public address.
+* **Device Hardening:** I hardened both devices the same way — hostnames, 1024-bit RSA keys, SSHv2-only access, idle timeouts, encrypted passwords, and a legal MOTD banner.
 
 ---
 
 ## 2. Network Topology & Addressing Schema
 
-The network operates on a base block of **`172.30.98.0/23`**, custom-subnetted to satisfy variable host densities and security boundaries.
+Everything sits on the block I was assigned, **`172.30.98.0/23`**, subnetted so each VLAN only gets the address space it actually needs — the full VLSM breakdown is in `addressing/ip-addressing-plan.md`.
 
 ```mermaid
 flowchart TB
@@ -115,7 +115,7 @@ flowchart TB
 | **Technical** | 20 | `172.30.98.128/25` | `172.30.98.129 - .254` | `172.30.98.129` | PC3, PC4, PC5 |
 | **Printers** | 30 | `172.30.99.0/28` | `172.30.99.1 - .14` | `172.30.99.1` | `172.30.99.2` (Printer0) |
 | **Contractor Wi-Fi** | 40 | `172.30.99.16/28` | `172.30.99.17 - .30` | `172.30.99.17` | WRT300N AP (Bridged), Laptop1, Laptop2 |
-| **ISP WAN Link** | N/A | `203.0.113.0/30` | `203.0.113.1 - .2` | `203.0.113.2` | `203.0.113.1` (Edge R1), `203.0.113.2` (ISP Upstream) |
+| **ISP WAN Link** | N/A | `203.0.113.0/30` | `203.0.113.1 - .2` | `203.0.113.2` | `203.0.113.1` (Kopano-Edge-R1), `203.0.113.2` (ISP Upstream) |
 
 ---
 
@@ -123,7 +123,7 @@ flowchart TB
 
 ### A. Router-on-a-Stick & Scoped DHCP Relays
 
-`Kopano-Edge-R1` uses 802.1Q sub-interfaces to route between VLANs. Each sub-interface is configured with `ip helper-address 172.30.98.2` to forward DHCP broadcast requests to the central DHCP server.
+`Kopano-Edge-R1` routes between the VLANs on 802.1Q sub-interfaces. I put `ip helper-address 172.30.98.2` on every sub-interface so each VLAN's DHCP broadcast gets forwarded as a unicast to the central server.
 
 ```text
 interface GigabitEthernet0/0.10
@@ -157,8 +157,8 @@ interface GigabitEthernet0/0.40
 
 ### B. Access Control Lists (ACL Security Policies)
 
-* **ACL 100 (Contractor Isolation):** Applied inbound on `Gi0/0.40`. Blocks guest wireless users on VLAN 40 from reaching the sensitive Admin Server (`172.30.98.2`) while permitting outbound Internet routing.
-* **ACL 102 (Layer 4 Inter-Departmental Isolation):** Applied inbound on `Gi0/0.10` and `Gi0/0.20`. Explicitly blocks FTP (TCP 21) and SMB (TCP 445) between Admin and Technical subnets to prevent unauthorized file transfers, while permitting cross-departmental printer access (`172.30.99.2`) and public Internet routing (`8.8.8.8`).
+* **ACL 100 (Contractor Isolation):** Applied inbound on `Gi0/0.40`. Contractors on the wireless VLAN can't reach the Admin server (`172.30.98.2`), but they can still get out to the internet.
+* **ACL 102 (Layer 4 Inter-Departmental Isolation):** Applied inbound on `Gi0/0.10` and `Gi0/0.20`. I blocked only FTP (TCP 21) and SMB (TCP 445) between Admin and Technical — the file-sharing protocols — so printer access, ICMP, and internet traffic still flow.
 
 ```text
 access-list 100 deny ip 172.30.99.16 0.0.0.15 host 172.30.98.2
@@ -172,16 +172,16 @@ access-list 102 permit ip any any
 
 ```
 
-> **Design Scope Note (🟠):** *File-sharing isolation between Admin (VLAN 10) and Technical (VLAN 20) is enforced specifically against high-risk storage protocols (FTP on TCP 21 and SMB on TCP 445). Standard management and ICMP traffic remain permitted across departments.*
+> **Design Scope Note (🟠):** *I scoped the isolation to file-sharing protocols specifically — FTP (TCP 21) and SMB (TCP 445). That was deliberate: printer sharing (Brief §8) and normal ICMP/management traffic still need to cross departments, so a blanket block would have broken the shared-printer requirement.*
 
 ### C. Infrastructure Hardening & Management Security
 
-Both `Kopano-Edge-R1` and `Kopano-Core-SW1` are hardened according to Cisco enterprise guidelines:
+I hardened `Kopano-Edge-R1` and `Kopano-Core-SW1` the same way:
 
-* **Hostnames & Domain:** Standardized identifiers under `kopano.co.za`.
-* **SSH v2 Enforcement:** Generated 1024-bit RSA keys and restricted remote access to encrypted VTY lines (`transport input ssh`).
-* **AAA & Local Credentials:** Configured local `admin` account with secret hashing.
-* **CLI Protections:** Disabled DNS lookup timeouts (`no ip domain-lookup`), enforced password encryption (`service password-encryption`), set 5-minute idle timeouts (`exec-timeout 5 0`), and added legal MOTD login warnings.
+* **Hostnames & Domain:** Standard identifiers under `kopano.co.za`.
+* **SSH v2 Enforcement:** I generated 1024-bit RSA keys and locked the VTY lines down to encrypted SSH only (`transport input ssh`).
+* **AAA & Local Credentials:** A local `admin` account with hashed secrets.
+* **CLI Protections:** `no ip domain-lookup`, `service password-encryption`, 5-minute idle timeouts (`exec-timeout 5 0`), and a legal MOTD login banner.
 
 ```text
 hostname Kopano-Edge-R1
@@ -220,23 +220,25 @@ line vty 0 4
 
 ## 4. Official Troubleshooting Log & Verification
 
-> **Full troubleshooting cycle:** three deliberate fault scenarios — Layer 3 DHCP relay (FLT-01), Layer 2 trunk pruning (FLT-02), and ACL over-blocking (FLT-03) — with step-by-step injection, capture, remediation, and recovery are documented in [`docs/troubleshooting-log.md`](docs/troubleshooting-log.md). FLT-01 below is the primary deliberate fault.
+> **Full troubleshooting cycle:** I ran three deliberate fault scenarios — Layer 3 DHCP relay (FLT-01), Layer 2 trunk pruning (FLT-02), and ACL over-blocking (FLT-03) — each with inject → capture → remediate → recover steps. The full write-up is in [`docs/troubleshooting-log.md`](docs/troubleshooting-log.md); FLT-01 below is the primary deliberate fault.
 
 ### Primary Deliberate Fault: DHCP Relay Interruption
 
-* **Induced Fault:** Removed `ip helper-address 172.30.98.2` from `GigabitEthernet0/0.20` on `Kopano-Edge-R1`.
-* **Observed Failure:** Technical PCs (PC3, PC4, PC5) failed to obtain IP leases from the central server upon running `ipconfig /renew`. The devices defaulted to Automatic Private IP Addressing (`169.254.x.x/16`), severing all inter-VLAN and Internet connectivity.
-* **Root Cause Analysis:** Without the unicast `ip helper-address` encapsulation, DHCP `DISCOVER` broadcasts originated by VLAN 20 clients were dropped at the sub-interface boundary.
-* **Remediation & Resolution:** Re-applied `ip helper-address 172.30.98.2` to `Gi0/0.20`. Executed `ipconfig /renew` on client endpoints, successfully restoring IP assignment (`172.30.98.130/25`), gateway reachability, and DNS resolution.
+* **Induced Fault:** I removed `ip helper-address 172.30.98.2` from `GigabitEthernet0/0.20` on `Kopano-Edge-R1`.
+* **Observed Failure:** PC3, PC4, and PC5 then failed to get leases on `ipconfig /renew` and fell back to APIPA (`169.254.x.x/16`) — that cut off all inter-VLAN and internet connectivity for the Technical department.
+* **Root Cause Analysis:** With the helper-address gone, VLAN 20's DHCP `DISCOVER` broadcast was dropped at the sub-interface boundary — the server never saw it.
+* **Remediation & Resolution:** I re-applied `ip helper-address 172.30.98.2` to `Gi0/0.20` and ran `ipconfig /renew` again. PC3 picked up `172.30.98.130/25` and gateway/DNS connectivity came back.
 
 ### Supplementary Build Troubleshooting: WRT300N Wireless AP Bridging
 
-* **Symptom:** Wireless contractor laptops connected to WRT300N were unable to reach external addresses.
-* **Resolution:** Reconfigured WRT300N to operate strictly as a Layer 2 access point by moving the uplink cable from the WAN port to a LAN port, disabling internal DHCP, and allowing `Kopano-Core-SW1` to handle 802.1Q tagging on VLAN 40.
+* **Symptom:** The contractor laptops couldn't reach anything outside the network.
+* **Resolution:** I reconfigured the WRT300N as a plain Layer 2 access point — moved the uplink from the WAN port to a LAN port, disabled its internal DHCP, and let `Kopano-Core-SW1` handle the 802.1Q tagging on VLAN 40.
 
 ---
 
 ## 5. Test Evidence & Verification Matrix
+
+I ran each test in Packet Tracer and captured the result (screenshots in `assets/evidence/`):
 
 | Test ID | Test Scenario | Source Device | Target Destination | Protocol / Port | Expected Result | Actual Result / Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -270,11 +272,11 @@ git clone https://github.com/Naxisbeast/CMPG325-Kopano-Network.git
 
 ## 7. Beyond-the-Brief Engineering Decisions
 
-Six deliberate decisions take this build beyond a minimum homework submission. Each is flagged 🟠 as a design decision throughout the repository documentation and makes a strong talking point for the video presentation.
+These are the six decisions I made that I think take this past a basic submission. I've flagged each one 🟠 in the documentation, and they're worth talking through in the video.
 
-1. **Dedicated DHCP server host** — DHCP runs on `172.30.98.2` in VLAN 10 instead of on the router, so the router genuinely relays VLANs 20/30/40 via `ip helper-address`, stamping `giaddr` on each request.
-2. **Dedicated shared printer VLAN** — `Printer0` sits in its own VLAN 30 (`172.30.99.0/28`), so printer sharing crosses departments with clean ACLs and demonstrates physical-to-logical separation (cabled on `SW-ADMIN` physically, VLAN 30 logically).
-3. **Granular Layer 4 protocol filtering** — ACL 102 targets only the high-risk file-sharing ports FTP (TCP 21) and SMB (TCP 445), leaving ICMP, management, and printer traffic open across departments.
-4. **WRT300N as a pure Layer 2 bridge** — the consumer router's WAN port is bypassed (uplink on a LAN port), internal DHCP is disabled, and `Kopano-Core-SW1` handles 802.1Q tagging, avoiding the device's default double-NAT/routing behaviour.
-5. **Outbound NAT/PAT** — internal `172.30.98.0/23` is overloaded onto the simulated public WAN `203.0.113.1` (ISP upstream `.2`, DNS `8.8.8.8`), giving all VLANs and contractors realistic internet routing.
-6. **Extended star / hierarchical topology** — core `Kopano-Core-SW1` feeds access `SW-ADMIN`/`SW-TECH` over defined 802.1Q trunks, separating broadcast domains across wiring closets instead of a single flat switch.
+1. **Dedicated DHCP server host** — instead of putting DHCP on the router, I stood up a dedicated server (`172.30.98.2`) in VLAN 10. That forces the router to act as a real relay agent for VLANs 20/30/40, which is exactly what the brief's DHCP challenge asks for.
+2. **Dedicated shared printer VLAN** — I gave the printer its own VLAN 30 (`172.30.99.0/28`) instead of dropping it into a department's subnet, so printer sharing crosses departments with clean ACLs and a clear physical/logical separation.
+3. **Granular Layer 4 protocol filtering** — ACL 102 blocks only the file-sharing ports (FTP/SMB); I deliberately left ICMP, management, and printer traffic flowing between departments.
+4. **WRT300N as a pure Layer 2 bridge** — I bypassed the WRT300N's WAN port, moved the uplink to a LAN port, and disabled its DHCP so the core switch handles the 802.1Q tagging — turning a consumer router into a plain L2 bridge instead of double-NATing.
+5. **Outbound NAT/PAT** — I PAT the private block out `203.0.113.1` (ISP `.2`, DNS `8.8.8.8`) so every internal host and contractor gets realistic internet routing.
+6. **Extended star / hierarchical topology** — I built it around a core switch (`Kopano-Core-SW1`) feeding two access switches over 802.1Q trunks, separating broadcast domains across wiring closets instead of one flat switch.
