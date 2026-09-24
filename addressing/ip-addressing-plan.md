@@ -1,3 +1,5 @@
+[⬅ Back to the main README](../README.md)
+
 # IP Addressing Plan (VLSM)
 **Project:** CMPG325-2026-147, Kopano Fibre & Wireless ISP (Mahikeng)
 **Assigned block:** 172.30.98.0/23 (512 total addresses, 172.30.98.0 to 172.30.99.255)

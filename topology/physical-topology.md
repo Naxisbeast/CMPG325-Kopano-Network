@@ -1,3 +1,5 @@
+[⬅ Back to the main README](../README.md)
+
 # Physical Topology
 **Project:** CMPG325-2026-147, Kopano Fibre & Wireless ISP (Mahikeng)
 

@@ -6,6 +6,19 @@
 
 This is my CMPG 325 individual project for **Kopano Fibre & Wireless ISP** (Mahikeng) a segmented office network I designed and built in Cisco Packet Tracer. The repository holds the live topology (`.pkt`), the device configuration built into it, the security policies, and a test/evidence matrix with screenshots showing it works.
 
+## Reviewer's Guide — Where to Find Everything
+
+The four items requested for the implementation review, with direct links:
+
+| Review Item | Where it is |
+| --- | --- |
+| **1. Working Packet Tracer file** | [`packet-tracer/Kopano_Network_Topology.pkt`](packet-tracer/Kopano_Network_Topology.pkt) — open in **Cisco Packet Tracer v8+** (`File → Open`) |
+| **2. Assigned feature** — scoped multi-VLAN DHCP with relay (Brief §9) | Config: [§3A Router-on-a-Stick & Scoped DHCP Relays](#a-router-on-a-stick--scoped-dhcp-relays) · Design & relay rationale: [`addressing/ip-addressing-plan.md`](addressing/ip-addressing-plan.md) §4 |
+| **3. Testing evidence** | Test matrix: [§5 Test Evidence & Verification Matrix](#5-test-evidence--verification-matrix) · Screenshots: [`assets/evidence/`](assets/evidence/) (tests) & [`assets/faults/`](assets/faults/) (fault cycle) · Fault log: [`docs/troubleshooting-log.md`](docs/troubleshooting-log.md) |
+| **4. Updated GitHub portfolio** | This repository — full folder map in [Repository Structure](#repository-structure) below |
+
+**Fastest review path (~5 minutes):** open the `.pkt` → confirm the DHCP relay config in §3A → run through the tests in §5 → check the fault cycle in `docs/troubleshooting-log.md`.
+
 ## Repository Structure
 
 ```

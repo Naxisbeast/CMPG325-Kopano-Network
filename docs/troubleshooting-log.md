@@ -1,3 +1,5 @@
+[⬅ Back to the main README](../README.md)
+
 # Troubleshooting Log — Deliberate Fault Cycle
 
 Three distinct, real-world failure scenarios demonstrate the project's troubleshooting methodology (Brief §9): a **Layer 3 DHCP relay** breakdown, a **Layer 2 trunking** failure, and a **security ACL** misconfiguration. Each follows the complete cycle — inject fault → verify & capture → remediate → verify recovery — with screenshots under [`assets/faults/`](../assets/faults/).
