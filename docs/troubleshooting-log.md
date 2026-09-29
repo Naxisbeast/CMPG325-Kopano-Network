@@ -134,7 +134,7 @@ On `Kopano-Edge-R1`:
 enable
 configure terminal
 ip access-list extended 102
- no deny tcp 172.30.98.128 0.0.0.127 host 172.30.98.2 eq ftp
+ no deny tcp 172.30.98.128 0.0.0.127 172.30.98.0 0.0.0.127 eq ftp
  1 deny ip 172.30.98.128 0.0.0.127 172.30.98.0 0.0.0.127
 end
 ```
