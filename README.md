@@ -25,7 +25,8 @@ The four items requested for the implementation review, with direct links:
 CMPG325-Kopano-Network/
 ├── README.md
 ├── packet-tracer/           Live Cisco Packet Tracer topology (.pkt)
-├── assets/                  Verification evidence screenshots (TEST-01..TEST-06)
+├── configs/                 Exported device running-configs (.cfg)
+├── assets/                  Verification evidence screenshots (TEST-01..TEST-10)
 ├── requirements/            Client requirements traceability matrix
 ├── topology/                Physical & logical topology design
 ├── addressing/              VLSM addressing and DHCP scope plan
@@ -107,7 +108,7 @@ flowchart TB
 
     CORE ---|"Trunk"| SWA
     CORE ---|"Trunk"| SWT
-    CORE ---|"Trunk"| AP
+    CORE ---|"Access · VLAN 40"| AP
 
     class INET,ISP wan
     class EDGE,CORE core
@@ -134,15 +135,16 @@ flowchart TB
 
 ## 3. Core Technical Implementation & Configurations
 
+The complete `show running-config` exports for both devices are saved as [`configs/Kopano-Edge-R1.cfg`](configs/Kopano-Edge-R1.cfg) and [`configs/Kopano-Core-SW1.cfg`](configs/Kopano-Core-SW1.cfg). The key excerpts are reproduced below.
+
 ### A. Router-on-a-Stick & Scoped DHCP Relays
 
-`Kopano-Edge-R1` routes between the VLANs on 802.1Q sub-interfaces. I put `ip helper-address 172.30.98.2` on every sub-interface so each VLAN's DHCP broadcast gets forwarded as a unicast to the central server.
+`Kopano-Edge-R1` routes between the VLANs on 802.1Q sub-interfaces. I put `ip helper-address 172.30.98.2` on the sub-interfaces for the **remote** VLANs (20, 30, 40) so their DHCP broadcasts get forwarded as unicasts to the central server in VLAN 10 — the server's own VLAN 10 needs no relay because the server is local to it.
 
 ```text
 interface GigabitEthernet0/0.10
  encapsulation dot1Q 10
  ip address 172.30.98.1 255.255.255.128
- ip helper-address 172.30.98.2
  ip nat inside
  ip access-group 102 in
 
@@ -170,11 +172,13 @@ interface GigabitEthernet0/0.40
 
 ### B. Access Control Lists (ACL Security Policies)
 
-* **ACL 100 (Contractor Isolation):** Applied inbound on `Gi0/0.40`. Contractors on the wireless VLAN can't reach the Admin server (`172.30.98.2`), but they can still get out to the internet.
+* **ACL 100 (Contractor Isolation):** Applied inbound on `Gi0/0.40`. Contractors on the wireless VLAN keep working DHCP and Internet access, but the ACL denies them any traffic into the internal subnets — the whole Admin/Technical block (`172.30.98.0/23`) and the Printer VLAN (`172.30.99.0/28`).
 * **ACL 102 (Layer 4 Inter-Departmental Isolation):** Applied inbound on `Gi0/0.10` and `Gi0/0.20`. I blocked only FTP (TCP 21) and SMB (TCP 445) between Admin and Technical — the file-sharing protocols — so printer access, ICMP, and internet traffic still flow.
 
 ```text
-access-list 100 deny ip 172.30.99.16 0.0.0.15 host 172.30.98.2
+access-list 100 permit udp any any eq bootps
+access-list 100 deny ip 172.30.99.16 0.0.0.15 172.30.98.0 0.0.1.255
+access-list 100 deny ip 172.30.99.16 0.0.0.15 172.30.99.0 0.0.0.15
 access-list 100 permit ip any any
 
 access-list 102 deny tcp 172.30.98.0 0.0.0.127 172.30.98.128 0.0.0.127 eq ftp
@@ -193,7 +197,7 @@ I hardened `Kopano-Edge-R1` and `Kopano-Core-SW1` the same way:
 
 * **Hostnames & Domain:** Standard identifiers under `kopano.co.za`.
 * **SSH v2 Enforcement:** I generated 1024-bit RSA keys and locked the VTY lines down to encrypted SSH only (`transport input ssh`).
-* **AAA & Local Credentials:** A local `admin` account with hashed secrets.
+* **AAA & Local Credentials:** Two local accounts with hashed secrets — `admin` (management) and `KopanoAdmin` (the SSH account verified in TEST-06). The `enable` secret shares `KopanoAdmin`'s hash.
 * **CLI Protections:** `no ip domain-lookup`, `service password-encryption`, 5-minute idle timeouts (`exec-timeout 5 0`), and a legal MOTD login banner.
 
 ```text
@@ -203,6 +207,7 @@ crypto key generate rsa general-keys modulus 1024
 ip ssh version 2
 
 username admin secret Kopano@2026!
+username KopanoAdmin secret KopanoAdminPass
 enable secret KopanoAdminPass
 
 service password-encryption
@@ -229,18 +234,40 @@ line vty 0 4
 
 ```
 
+### D. NAT (PAT) & Default Routing
+
+All internal subnets share one public IP via overload NAT — a standard ACL selects the private block and the WAN interface performs PAT out to the ISP (`203.0.113.2`, DNS `8.8.8.8`):
+
+```text
+access-list 1 permit 172.30.98.0 0.0.1.255
+ip nat inside source list 1 interface GigabitEthernet0/1 overload
+
+interface GigabitEthernet0/1
+ ip address 203.0.113.1 255.255.255.252
+ ip nat outside
+
+ip route 0.0.0.0 0.0.0.0 GigabitEthernet0/1
+ip route 0.0.0.0 0.0.0.0 203.0.113.2
+```
+
 ---
 
 ## 4. Official Troubleshooting Log & Verification
 
-> **Full troubleshooting cycle:** I ran three deliberate fault scenarios — Layer 3 DHCP relay (FLT-01), Layer 2 trunk pruning (FLT-02), and ACL over-blocking (FLT-03) — each with inject → capture → remediate → recover steps. The full write-up is in [`docs/troubleshooting-log.md`](docs/troubleshooting-log.md); FLT-01 below is the primary deliberate fault.
+> **Full troubleshooting cycle:** I ran three deliberate fault scenarios — Layer 3 DHCP relay (FLT-01), Layer 2 trunk pruning (FLT-02), and ACL over-blocking (FLT-03) — each with inject → capture → remediate → recover steps. The full write-up is in [`docs/troubleshooting-log.md`](docs/troubleshooting-log.md); FLT-01 below is the primary deliberate fault. All six screenshots (3 failures + 3 recoveries) live in [`assets/faults/`](assets/faults/):
+
+| Fault | Layer / Component | Failure Screenshot | Recovery Screenshot |
+| --- | --- | --- | --- |
+| **FLT-01** — DHCP relay removed from `Gi0/0.20` | L3 · `Kopano-Edge-R1` | [`flt-01-dhcp-fail.png`](assets/faults/flt-01-dhcp-fail.png) | [`flt-01-dhcp-recover.png`](assets/faults/flt-01-dhcp-recover.png) |
+| **FLT-02** — VLAN 20 pruned from trunk | L2 · `Kopano-Core-SW1` | [`flt-02-trunk-fail.png`](assets/faults/flt-02-trunk-fail.png) | [`flt-02-trunk-recover.png`](assets/faults/flt-02-trunk-recover.png) |
+| **FLT-03** — blanket `deny ip` in ACL 102 | Security · `Kopano-Edge-R1` | [`flt-03-acl-fail.png`](assets/faults/flt-03-acl-fail.png) | [`flt-03-acl-recover.png`](assets/faults/flt-03-acl-recover.png) |
 
 ### Primary Deliberate Fault: DHCP Relay Interruption
 
 * **Induced Fault:** I removed `ip helper-address 172.30.98.2` from `GigabitEthernet0/0.20` on `Kopano-Edge-R1`.
-* **Observed Failure:** PC3, PC4, and PC5 then failed to get leases on `ipconfig /renew` and fell back to APIPA (`169.254.x.x/16`) — that cut off all inter-VLAN and internet connectivity for the Technical department.
+* **Observed Failure:** PC3, PC4, and PC5 then failed to get leases on `ipconfig /renew` and fell back to APIPA (`169.254.x.x/16`) — that cut off all inter-VLAN and internet connectivity for the Technical department. ([`assets/faults/flt-01-dhcp-fail.png`](assets/faults/flt-01-dhcp-fail.png))
 * **Root Cause Analysis:** With the helper-address gone, VLAN 20's DHCP `DISCOVER` broadcast was dropped at the sub-interface boundary — the server never saw it.
-* **Remediation & Resolution:** I re-applied `ip helper-address 172.30.98.2` to `Gi0/0.20` and ran `ipconfig /renew` again. PC3 picked up `172.30.98.130/25` and gateway/DNS connectivity came back.
+* **Remediation & Resolution:** I re-applied `ip helper-address 172.30.98.2` to `Gi0/0.20` and ran `ipconfig /renew` again. PC3 picked up `172.30.98.130/25` and gateway/DNS connectivity came back. ([`assets/faults/flt-01-dhcp-recover.png`](assets/faults/flt-01-dhcp-recover.png))
 
 ### Supplementary Build Troubleshooting: WRT300N Wireless AP Bridging
 
@@ -251,16 +278,18 @@ line vty 0 4
 
 ## 5. Test Evidence & Verification Matrix
 
-I ran each test in Packet Tracer and captured the result (screenshots in `assets/evidence/`):
+I ran each test in Packet Tracer and captured the result (screenshots in [`assets/evidence/`](assets/evidence/)). For the ACL and NAT tests I captured the **PC and the router CLI side-by-side**, so the failing command *and* the matching ACL/NAT counters appear together in one shot. TEST-07 and TEST-10 extend the matrix beyond the core six to prove scoped DHCP on the Admin VLAN and the positive guest-Internet path:
 
 | Test ID | Test Scenario | Source Device | Target Destination | Protocol / Port | Expected Result | Actual Result / Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| **TEST-01** | Scoped DHCP Allocation | PC3 (Technical) | Central DHCP Server | UDP 67/68 | **PASS** | Leased `172.30.98.130/25`, GW `172.30.98.129` ([Evidence](assets/evidence/test01_dhcp_lease.png)) |
-| **TEST-02** | Internet Routing & NAT | PC0 (Admin) | `8.8.8.8` (Public DNS) | ICMP | **PASS** | 0% Packet Loss; PAT active on `203.0.113.1` ([Evidence](assets/evidence/test02_nat_ping.png)) |
-| **TEST-03** | Cross-VLAN Printer Access | PC3 (Technical) | `172.30.99.2` (Printer0) | ICMP | **PASS** | 0% Packet Loss (Permitted by ACL 102) ([Evidence](assets/evidence/test03_printer_ping.png)) |
-| **TEST-04** | Restricted FTP File Share | PC3 (Technical) | `172.30.98.2` (Admin Server) | TCP 21 (FTP) | **FAIL (BLOCK)** | Timed out; 24 match hits registered on ACL 102 ([Evidence](assets/evidence/test04_ftp_block.png)) |
-| **TEST-05** | Guest Wi-Fi Server Block | Laptop1 (Contractor) | `172.30.98.2` (Admin Server) | IP / ICMP | **FAIL (BLOCK)** | Destination Host Unreachable via ACL 100 ([Evidence](assets/evidence/test05_guest_block.png)) |
-| **TEST-06** | Encrypted SSH Management | PC1 (Admin) | `172.30.98.1` (Edge Router) | TCP 22 (SSHv2) | **PASS** | Authenticated session established to `Kopano-Edge-R1>` ([Evidence](assets/evidence/test06_ssh_verify.png)) |
+| **TEST-01** | Scoped DHCP Allocation | PC3 (Technical) | Central DHCP Server | UDP 67/68 | **PASS** | Leased `172.30.98.130/25`, GW `172.30.98.129`, DNS `8.8.8.8` ([Evidence](assets/evidence/test-01-dhcp-pc3.png)) |
+| **TEST-02** | Internet Routing & NAT | PC0 (Admin) | `8.8.8.8` (Public DNS) | ICMP | **PASS** | 0% Packet Loss; `show ip nat translations` on `Kopano-Edge-R1` shows PAT entries mapping `172.30.98.x` out `203.0.113.1` ([Evidence](assets/evidence/test-02-nat-pc0.png)) |
+| **TEST-03** | Cross-VLAN Printer Access | PC3 (Technical) | `172.30.99.2` (Printer0) | ICMP | **PASS** | 0% Packet Loss (Permitted by ACL 102) ([Evidence](assets/evidence/test-03-printer-ping.png)) |
+| **TEST-04** | Restricted FTP File Share | PC3 (Technical) | `172.30.98.2` (Admin Server) | TCP 21 (FTP) | **FAIL (BLOCK)** | Timed out; `show access-lists 102` shows `matches` counters next to `deny tcp ... eq ftp` ([Evidence](assets/evidence/test-04-ftp-block-pc3.png)) |
+| **TEST-05** | Guest Wi-Fi Internal Block | Laptop1 (Contractor) | `172.30.98.2` (Admin Server) | IP / ICMP | **FAIL (BLOCK)** | `Request timed out`; `show access-lists 100` shows hits on `deny ip 172.30.99.16 0.0.0.15 172.30.98.0 0.0.1.255` ([Evidence](assets/evidence/test-05-guest-block-laptop1.png)) |
+| **TEST-06** | Encrypted SSH Management | PC1 (Admin) | `172.30.98.1` (Edge Router) | TCP 22 (SSHv2) | **PASS** | `ssh -l KopanoAdmin` authenticated session established to `Kopano-Edge-R1>` ([Evidence](assets/evidence/test-06-ssh-pc1.png)) |
+| **TEST-07** | Scoped DHCP on Admin *(Additional Scope)* | PC0 (Admin) | Central DHCP Server | UDP 67/68 | **PASS** | Valid Admin lease `172.30.98.x/25` + DNS `8.8.8.8` ([Evidence](assets/evidence/test-07-dhcp-vlan10-pc0.png)) |
+| **TEST-10** | Contractor Internet *(Positive Control)* | Laptop1 (Contractor) | `8.8.8.8` (Public DNS) | ICMP | **PASS** | 0% Packet Loss — contractors reach the Internet while internal resources stay blocked by ACL 100 ([Evidence](assets/evidence/test-10-guest-internet.png)) |
 
 ---
 
