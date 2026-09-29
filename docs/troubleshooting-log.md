@@ -8,8 +8,8 @@ Three distinct, real-world failure scenarios demonstrate the project's troublesh
 
 | Fault ID | Component | Root Cause | Symptom | Remediation Command | Verification |
 | --- | --- | --- | --- | --- | --- |
-| **FLT-01** | `Gi0/0.20` (`Kopano-Edge-R1`) | Missing `ip helper-address` | PC3 assigned APIPA `169.254.x.x` | `ip helper-address 172.30.98.2` | `ipconfig /renew` yields `172.30.98.130` |
-| **FLT-02** | `Gi0/1` Trunk (`Kopano-Core-SW1`) | VLAN 20 removed from trunk | PC3 unable to reach gateway `172.30.98.129` | `switchport trunk allowed vlan add 20` | ICMP ping 0% loss |
+| **FLT-01** | `Gi0/0.20` (`Kopano-Edge-R1`) | Missing `ip helper-address` | PC3 assigned APIPA `169.254.x.x` | `ip helper-address 172.30.98.2` | `ipconfig /renew` yields `172.30.98.132` |
+| **FLT-02** | `Gi0/1` Trunk (`Kopano-Core-SW1`) | VLAN 20 removed from trunk | PC4 unable to reach gateway `172.30.98.129` | `switchport trunk allowed vlan add 20` | ICMP ping 0% loss |
 | **FLT-03** | ACL 102 (`Kopano-Edge-R1`) | Blanket `deny ip` rule inserted | ICMP & printer traffic blocked from Technical | Restored L4 port-filtered rules (`eq ftp`, `eq 445`) | ICMP ping pass / FTP blocked |
 
 ---
@@ -62,7 +62,7 @@ write memory
 ipconfig /renew
 ```
 
-2. **Result:** PC3 re-obtains `172.30.98.130/25` from `172.30.98.2`.
+2. **Result:** PC3 re-obtains `172.30.98.132/25` from `172.30.98.2`.
 
 ![PC3 showing valid DHCP lease](../assets/faults/flt-01-dhcp-recover.png)
 
@@ -86,7 +86,7 @@ end
 
 ### Step 2: Verify & Capture Failure
 
-1. On **PC3 (Technical)** Command Prompt, ping its default gateway:
+1. On **PC4 (Technical)** Command Prompt, ping its default gateway:
 
 ```cmd
 ping 172.30.98.129
@@ -94,7 +94,7 @@ ping 172.30.98.129
 
 2. **Result:** `Request timed out` (100% packet loss).
 
-![PC3 ping to gateway failing (100% loss)](../assets/faults/flt-02-trunk-fail.png)
+![PC4 ping to gateway failing (100% loss)](../assets/faults/flt-02-trunk-fail.png)
 
 ### Step 3: Remediate (Fix)
 
@@ -110,7 +110,7 @@ write memory
 
 ### Step 4: Verify Recovery
 
-1. On **PC3** Command Prompt:
+1. On **PC4** Command Prompt:
 
 ```cmd
 ping 172.30.98.129
@@ -118,7 +118,7 @@ ping 172.30.98.129
 
 2. **Result:** 4 successful replies (0% packet loss).
 
-![PC3 ping to gateway successful (0% loss)](../assets/faults/flt-02-trunk-recover.png)
+![PC4 ping to gateway successful (0% loss)](../assets/faults/flt-02-trunk-recover.png)
 
 ---
 
@@ -135,13 +135,13 @@ enable
 configure terminal
 ip access-list extended 102
  no deny tcp 172.30.98.128 0.0.0.127 host 172.30.98.2 eq ftp
- 1 deny ip 172.30.98.128 0.0.0.127 host 172.30.98.2
+ 1 deny ip 172.30.98.128 0.0.0.127 172.30.98.0 0.0.0.127
 end
 ```
 
 ### Step 2: Verify & Capture Failure
 
-1. On **PC3 (Technical)** Command Prompt, ping the Admin Server / shared printer:
+1. On **PC5 (Technical)** Command Prompt, ping the Admin Server / shared printer:
 
 ```cmd
 ping 172.30.98.2
@@ -149,7 +149,7 @@ ping 172.30.98.2
 
 2. **Result:** `Destination Host Unreachable` (dropped by ACL 102 on `Gi0/0.20`).
 
-![PC3 showing Destination Host Unreachable](../assets/faults/flt-03-acl-fail.png)
+![PC5 showing Destination Host Unreachable](../assets/faults/flt-03-acl-fail.png)
 
 ### Step 3: Remediate (Fix)
 
@@ -168,7 +168,7 @@ write memory
 
 ### Step 4: Verify Recovery
 
-1. On **PC3** Command Prompt:
+1. On **PC5** Command Prompt:
 
 ```cmd
 ping 172.30.99.2
@@ -176,7 +176,7 @@ ping 172.30.99.2
 
 2. **Result:** Ping succeeds while FTP (`ftp 172.30.98.2`) remains strictly blocked as per design.
 
-![PC3 ICMP access to printer restored](../assets/faults/flt-03-acl-recover.png)
+![PC5 ICMP access to printer restored](../assets/faults/flt-03-acl-recover.png)
 
 ---
 
