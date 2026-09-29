@@ -286,10 +286,10 @@ I ran each test in Packet Tracer and captured the result (screenshots in [`asset
 | **TEST-02** | Internet Routing & NAT | PC0 (Admin) | `8.8.8.8` (Public DNS) | ICMP | **PASS** | 0% Packet Loss; `show ip nat translations` on `Kopano-Edge-R1` shows PAT entries mapping `172.30.98.x` out `203.0.113.1` ([Evidence](assets/evidence/test-02-nat-pc0.png)) |
 | **TEST-03** | Cross-VLAN Printer Access | PC3 (Technical) | `172.30.99.2` (Printer0) | ICMP | **PASS** | 0% Packet Loss (Permitted by ACL 102) ([Evidence](assets/evidence/test-03-printer-ping.png)) |
 | **TEST-04** | Restricted FTP File Share | PC3 (Technical) | `172.30.98.2` (Admin Server) | TCP 21 (FTP) | **FAIL (BLOCK)** | Timed out; `show access-lists 102` shows `matches` counters next to `deny tcp ... eq ftp` ([Evidence](assets/evidence/test-04-ftp-block-pc3.png)) |
-| **TEST-05** | Guest Wi-Fi Internal Block | Contractor-1 (Contractor) | `172.30.98.2` (Admin Server) | IP / ICMP | **FAIL (BLOCK)** | `Request timed out`; `show access-lists 100` shows hits on `deny ip 172.30.99.16 0.0.0.15 172.30.98.0 0.0.1.255` ([Evidence](assets/evidence/test-05-guest-block-laptop1.png)) |
-| **TEST-06** | Encrypted SSH Management | PC0 (Admin) | `172.30.98.1` (Edge Router) | TCP 22 (SSHv2) | **PASS** | `ssh -l KopanoAdmin` authenticated session established to `Kopano-Edge-R1>` ([Evidence](assets/evidence/test-06-ssh-pc1.png)) |
+| **TEST-05** | Guest Wi-Fi Internal Block | Contractor-1 (Contractor) | `172.30.98.2` (Admin Server) | IP / ICMP | **FAIL (BLOCK)** | `Request timed out`; `show access-lists 100` shows hits on `deny ip 172.30.99.16 0.0.0.15 172.30.98.0 0.0.1.255` ([Evidence](assets/evidence/test-05-guest-block-contractor-1.png)) |
+| **TEST-06** | Encrypted SSH Management | PC0 (Admin) | `172.30.98.1` (Edge Router) | TCP 22 (SSHv2) | **PASS** | `ssh -l KopanoAdmin` authenticated session established to `Kopano-Edge-R1>` ([Evidence](assets/evidence/test-06-ssh-pc0.png)) |
 | **TEST-07** | Scoped DHCP on Admin *(Additional Scope)* | PC0 (Admin) | Central DHCP Server | UDP 67/68 | **PASS** | Valid Admin lease `172.30.98.x/25` + DNS `8.8.8.8` ([Evidence](assets/evidence/test-07-dhcp-vlan10-pc0.png)) |
-| **TEST-10** | Contractor Internet *(Positive Control)* | Contractor-1 (Contractor) | `8.8.8.8` (Public DNS) | ICMP | **PASS** | 0% Packet Loss — contractors reach the Internet while internal resources stay blocked by ACL 100 ([Evidence](assets/evidence/test-10-guest-internet.png)) |
+| **TEST-10** | Contractor Internet *(Positive Control)* | Contractor-1 (Contractor) | `8.8.8.8` (Public DNS) | ICMP | **PASS** | 0% Packet Loss — contractors reach the Internet while internal resources stay blocked by ACL 100 ([Evidence](assets/evidence/test-10-contractor-internet.png)) |
 
 ---
 
