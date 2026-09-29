@@ -106,7 +106,7 @@ graph TD
     SWADMIN --> DHCPServer["DHCP Server 172.30.98.2<br/>VLAN 10"]
     SWADMIN --> Printer["Printer0 172.30.99.2<br/>VLAN 30"]
     SWTECH --> TechPCs["Technical PCs PC3-PC5<br/>VLAN 20"]
-    AP --> Contractors["Laptop1-Laptop2<br/>VLAN 40"]
+    AP --> Contractors["Contractor-1 &amp; Contractor-2<br/>VLAN 40"]
 
     style R1 fill:#dbeafe
     style CORE fill:#dbeafe
@@ -134,8 +134,8 @@ graph TD
               |                     |                     |
        [ SW-ADMIN ]          [ SW-TECH ]          [ WRT300N ]
           |    |    |            |    |              (L2 bridge)
-       PC0-PC2  DHCP         PC3-PC5               Laptop1
-       (Admin,  Server        (Tech,                Laptop2
+       PC0-PC2  DHCP         PC3-PC5               Contractor-1
+       (Admin,  Server        (Tech,                Contractor-2
         VLAN 10) 172.30.98.2   VLAN 20)              (VLAN 40)
                   (VLAN 10)
           |
