@@ -1,7 +1,7 @@
 # Kopano Fibre & Wireless ISP Network Infrastructure
 
 ![Cisco Packet Tracer](https://img.shields.io/badge/Cisco%20Packet%20Tracer-v8.x-blue?style=flat-square&logo=cisco)
-![Security](https://img.shields.io/badge/Security-SSHv2%20%7C%20ACLs%20%7C%20AAA-green?style=flat-square)
+![Security](https://img.shields.io/badge/Security-SSHv2%20%7C%20ACLs%20%7C%20Local%20Auth-green?style=flat-square)
 ![Academic Project](https://img.shields.io/badge/CMPG325-North--West%20University-blueviolet?style=flat-square)
 
 This is my CMPG 325 individual project for **Kopano Fibre & Wireless ISP** (Mahikeng) — a segmented office network I designed and built in Cisco Packet Tracer. The repository holds the live topology (`.pkt`), the device configuration built into it, the security policies, and a test/evidence matrix with screenshots showing it works.
@@ -101,8 +101,8 @@ flowchart TB
     subgraph GUEST["WRT300N AP: VLAN 40"]
         direction LR
         AP["WRT300N Wireless AP<br/>(L2 bridge)"]
-        L1["Laptop1"]
-        L2["Laptop2"]
+        L1["Contractor-1"]
+        L2["Contractor-2"]
         AP --- L1 & L2
     end
 
@@ -128,7 +128,7 @@ flowchart TB
 | **Admin** | 10 | `172.30.98.0/25` | `172.30.98.1 - .126` | `172.30.98.1` | `172.30.98.2` (Central Admin/DHCP Server), PC0, PC1, PC2 |
 | **Technical** | 20 | `172.30.98.128/25` | `172.30.98.129 - .254` | `172.30.98.129` | PC3, PC4, PC5 |
 | **Printers** | 30 | `172.30.99.0/28` | `172.30.99.1 - .14` | `172.30.99.1` | `172.30.99.2` (Printer0) |
-| **Contractor Wi-Fi** | 40 | `172.30.99.16/28` | `172.30.99.17 - .30` | `172.30.99.17` | WRT300N AP (Bridged), Laptop1, Laptop2 |
+| **Contractor Wi-Fi** | 40 | `172.30.99.16/28` | `172.30.99.17 - .30` | `172.30.99.17` | WRT300N AP (Bridged), Contractor-1, Contractor-2 |
 | **ISP WAN Link** | N/A | `203.0.113.0/30` | `203.0.113.1 - .2` | `203.0.113.2` | `203.0.113.1` (Kopano-Edge-R1), `203.0.113.2` (ISP Upstream) |
 
 ---
@@ -191,13 +191,13 @@ access-list 102 permit ip any any
 
 > **Design Scope Note (🟠):** *I scoped the isolation to file-sharing protocols specifically — FTP (TCP 21) and SMB (TCP 445). That was deliberate: printer sharing (Brief §8) and normal ICMP/management traffic still need to cross departments, so a blanket block would have broken the shared-printer requirement.*
 
-### C. Infrastructure Hardening & Management Security
+### C. Infrastructure Hardening & Local Credentials
 
 I hardened `Kopano-Edge-R1` and `Kopano-Core-SW1` the same way:
 
 * **Hostnames & Domain:** Standard identifiers under `kopano.co.za`.
 * **SSH v2 Enforcement:** I generated 1024-bit RSA keys and locked the VTY lines down to encrypted SSH only (`transport input ssh`).
-* **AAA & Local Credentials:** Two local accounts with hashed secrets — `admin` (management) and `KopanoAdmin` (the SSH account verified in TEST-06). The `enable` secret shares `KopanoAdmin`'s hash.
+* **Local Credentials (no `aaa new-model`):** Two local accounts with hashed secrets — `admin` (management) and `KopanoAdmin` (the SSH account verified in TEST-06). The `enable` secret shares `KopanoAdmin`'s hash.
 * **CLI Protections:** `no ip domain-lookup`, `service password-encryption`, 5-minute idle timeouts (`exec-timeout 5 0`), and a legal MOTD login banner.
 
 ```text
@@ -267,7 +267,7 @@ ip route 0.0.0.0 0.0.0.0 203.0.113.2
 * **Induced Fault:** I removed `ip helper-address 172.30.98.2` from `GigabitEthernet0/0.20` on `Kopano-Edge-R1`.
 * **Observed Failure:** PC3, PC4, and PC5 then failed to get leases on `ipconfig /renew` and fell back to APIPA (`169.254.x.x/16`) — that cut off all inter-VLAN and internet connectivity for the Technical department. ([`assets/faults/flt-01-dhcp-fail.png`](assets/faults/flt-01-dhcp-fail.png))
 * **Root Cause Analysis:** With the helper-address gone, VLAN 20's DHCP `DISCOVER` broadcast was dropped at the sub-interface boundary — the server never saw it.
-* **Remediation & Resolution:** I re-applied `ip helper-address 172.30.98.2` to `Gi0/0.20` and ran `ipconfig /renew` again. PC3 picked up `172.30.98.130/25` and gateway/DNS connectivity came back. ([`assets/faults/flt-01-dhcp-recover.png`](assets/faults/flt-01-dhcp-recover.png))
+* **Remediation & Resolution:** I re-applied `ip helper-address 172.30.98.2` to `Gi0/0.20` and ran `ipconfig /renew` again. PC3 picked up `172.30.98.132/25` and gateway/DNS connectivity came back. ([`assets/faults/flt-01-dhcp-recover.png`](assets/faults/flt-01-dhcp-recover.png))
 
 ### Supplementary Build Troubleshooting: WRT300N Wireless AP Bridging
 
@@ -282,14 +282,14 @@ I ran each test in Packet Tracer and captured the result (screenshots in [`asset
 
 | Test ID | Test Scenario | Source Device | Target Destination | Protocol / Port | Expected Result | Actual Result / Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| **TEST-01** | Scoped DHCP Allocation | PC3 (Technical) | Central DHCP Server | UDP 67/68 | **PASS** | Leased `172.30.98.130/25`, GW `172.30.98.129`, DNS `8.8.8.8` ([Evidence](assets/evidence/test-01-dhcp-pc3.png)) |
+| **TEST-01** | Scoped DHCP Allocation | PC3 (Technical) | Central DHCP Server | UDP 67/68 | **PASS** | Leased `172.30.98.132/25`, GW `172.30.98.129`, DNS `8.8.8.8` ([Evidence](assets/evidence/test-01-dhcp-pc3.png)) |
 | **TEST-02** | Internet Routing & NAT | PC0 (Admin) | `8.8.8.8` (Public DNS) | ICMP | **PASS** | 0% Packet Loss; `show ip nat translations` on `Kopano-Edge-R1` shows PAT entries mapping `172.30.98.x` out `203.0.113.1` ([Evidence](assets/evidence/test-02-nat-pc0.png)) |
 | **TEST-03** | Cross-VLAN Printer Access | PC3 (Technical) | `172.30.99.2` (Printer0) | ICMP | **PASS** | 0% Packet Loss (Permitted by ACL 102) ([Evidence](assets/evidence/test-03-printer-ping.png)) |
 | **TEST-04** | Restricted FTP File Share | PC3 (Technical) | `172.30.98.2` (Admin Server) | TCP 21 (FTP) | **FAIL (BLOCK)** | Timed out; `show access-lists 102` shows `matches` counters next to `deny tcp ... eq ftp` ([Evidence](assets/evidence/test-04-ftp-block-pc3.png)) |
-| **TEST-05** | Guest Wi-Fi Internal Block | Laptop1 (Contractor) | `172.30.98.2` (Admin Server) | IP / ICMP | **FAIL (BLOCK)** | `Request timed out`; `show access-lists 100` shows hits on `deny ip 172.30.99.16 0.0.0.15 172.30.98.0 0.0.1.255` ([Evidence](assets/evidence/test-05-guest-block-laptop1.png)) |
-| **TEST-06** | Encrypted SSH Management | PC1 (Admin) | `172.30.98.1` (Edge Router) | TCP 22 (SSHv2) | **PASS** | `ssh -l KopanoAdmin` authenticated session established to `Kopano-Edge-R1>` ([Evidence](assets/evidence/test-06-ssh-pc1.png)) |
+| **TEST-05** | Guest Wi-Fi Internal Block | Contractor-1 (Contractor) | `172.30.98.2` (Admin Server) | IP / ICMP | **FAIL (BLOCK)** | `Request timed out`; `show access-lists 100` shows hits on `deny ip 172.30.99.16 0.0.0.15 172.30.98.0 0.0.1.255` ([Evidence](assets/evidence/test-05-guest-block-laptop1.png)) |
+| **TEST-06** | Encrypted SSH Management | PC0 (Admin) | `172.30.98.1` (Edge Router) | TCP 22 (SSHv2) | **PASS** | `ssh -l KopanoAdmin` authenticated session established to `Kopano-Edge-R1>` ([Evidence](assets/evidence/test-06-ssh-pc1.png)) |
 | **TEST-07** | Scoped DHCP on Admin *(Additional Scope)* | PC0 (Admin) | Central DHCP Server | UDP 67/68 | **PASS** | Valid Admin lease `172.30.98.x/25` + DNS `8.8.8.8` ([Evidence](assets/evidence/test-07-dhcp-vlan10-pc0.png)) |
-| **TEST-10** | Contractor Internet *(Positive Control)* | Laptop1 (Contractor) | `8.8.8.8` (Public DNS) | ICMP | **PASS** | 0% Packet Loss — contractors reach the Internet while internal resources stay blocked by ACL 100 ([Evidence](assets/evidence/test-10-guest-internet.png)) |
+| **TEST-10** | Contractor Internet *(Positive Control)* | Contractor-1 (Contractor) | `8.8.8.8` (Public DNS) | ICMP | **PASS** | 0% Packet Loss — contractors reach the Internet while internal resources stay blocked by ACL 100 ([Evidence](assets/evidence/test-10-guest-internet.png)) |
 
 ---
 
@@ -308,7 +308,8 @@ git clone https://github.com/Naxisbeast/CMPG325-Kopano-Network.git
 4. **Administrative Credentials:**
    * **Console Password:** `ConsolePass2026!`
    * **Privileged EXEC (`enable`):** `KopanoAdminPass`
-   * **SSH Username / Secret:** `admin` / `Kopano@2026!`
+   * **SSH Account (`admin`):** `Kopano@2026!`
+   * **SSH Account (`KopanoAdmin`):** `KopanoAdminPass` *(used in TEST-06)*
 
 ---
 
