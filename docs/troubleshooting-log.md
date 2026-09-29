@@ -40,7 +40,7 @@ ipconfig /renew
 
 2. **Result:** Request times out. PC3 drops to an APIPA self-assigned address (`169.254.x.x`).
 
-![PC3 showing APIPA 169.254.x.x](../assets/faults/fault-01a-dhcp-apipa.png)
+![PC3 showing APIPA 169.254.x.x](../assets/faults/flt-01-dhcp-fail.png)
 
 ### Step 3: Remediate (Fix)
 
@@ -64,7 +64,7 @@ ipconfig /renew
 
 2. **Result:** PC3 re-obtains `172.30.98.130/25` from `172.30.98.2`.
 
-![PC3 showing valid DHCP lease](../assets/faults/fault-01b-dhcp-recovered.png)
+![PC3 showing valid DHCP lease](../assets/faults/flt-01-dhcp-recover.png)
 
 ---
 
@@ -94,7 +94,7 @@ ping 172.30.98.129
 
 2. **Result:** `Request timed out` (100% packet loss).
 
-![PC3 ping to gateway failing (100% loss)](../assets/faults/fault-02a-vlan20-pruned-ping-fail.png)
+![PC3 ping to gateway failing (100% loss)](../assets/faults/flt-02-trunk-fail.png)
 
 ### Step 3: Remediate (Fix)
 
@@ -118,7 +118,7 @@ ping 172.30.98.129
 
 2. **Result:** 4 successful replies (0% packet loss).
 
-![PC3 ping to gateway successful (0% loss)](../assets/faults/fault-02b-vlan20-trunk-restored.png)
+![PC3 ping to gateway successful (0% loss)](../assets/faults/flt-02-trunk-recover.png)
 
 ---
 
@@ -149,7 +149,7 @@ ping 172.30.98.2
 
 2. **Result:** `Destination Host Unreachable` (dropped by ACL 102 on `Gi0/0.20`).
 
-![PC3 showing Destination Host Unreachable](../assets/faults/fault-03a-acl-overblock-ping.png)
+![PC3 showing Destination Host Unreachable](../assets/faults/flt-03-acl-fail.png)
 
 ### Step 3: Remediate (Fix)
 
@@ -176,7 +176,7 @@ ping 172.30.99.2
 
 2. **Result:** Ping succeeds while FTP (`ftp 172.30.98.2`) remains strictly blocked as per design.
 
-![PC3 ICMP access to printer restored](../assets/faults/fault-03b-acl-restored-ping-pass.png)
+![PC3 ICMP access to printer restored](../assets/faults/flt-03-acl-recover.png)
 
 ---
 
