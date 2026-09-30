@@ -278,6 +278,12 @@ ip route 0.0.0.0 0.0.0.0 203.0.113.2
 * **Symptom:** The contractor laptops couldn't reach anything outside the network.
 * **Resolution:** I reconfigured the WRT300N as a plain Layer 2 access point — moved the uplink from the WAN port to a LAN port, disabled its internal DHCP, and let `Kopano-Core-SW1` handle the 802.1Q tagging on VLAN 40.
 
+### VLAN 30 Shared Printer Configuration and Reachability
+
+![Printer0 static IP and PC3 reachability check](../assets/evidence/fig-1b-vlan30-printer-verification.png)
+
+*Figure 1b — Printer0 (VLAN 30) static configuration (`172.30.99.2/28`, MAC 000A.F391.E959) verified from PC3 (VLAN 20): `ping 172.30.99.2` returns 4/4 replies (TTL 127) with the ARP entry resolved — proving inter-VLAN L2/L3 forwarding from VLAN 20 through gateway `172.30.98.129`.*
+
 ---
 
 ## 5. Test Evidence & Verification Matrix
@@ -296,10 +302,6 @@ I ran each test in Packet Tracer and captured the result (screenshots in [`asset
 | **TEST-08** | Relayed DHCP on Contractor VLAN | Contractor-1 (Contractor) | Central DHCP Server via `Gi0/0.40` relay | UDP 67/68 | **PASS** | Leased `172.30.99.18/28`, GW `172.30.99.17`, DHCP server `172.30.98.2` ([Evidence](assets/evidence/test-08-contractor-dhcp.png)) |
 | **TEST-09** | Public DNS Resolution | PC0 (Admin) | `google.com` (External DNS) | DNS (UDP 53) / ICMP | **PASS** | `nslookup google.com` resolves via `8.8.8.8`; `ping google.com` 0% loss, TTL 126 ([Evidence](assets/evidence/test-09-dns-resolution.png)) |
 | **TEST-10** | Contractor Internet *(Positive Control)* | Contractor-1 (Contractor) | `8.8.8.8` (Public DNS) | ICMP | **PASS** | 0% Packet Loss — contractors reach the Internet while internal resources stay blocked by ACL 100 ([Evidence](assets/evidence/test-10-contractor-internet.png)) |
-
-![Printer0 static IP and PC3 reachability check](../assets/evidence/fig-1b-vlan30-printer-verification.png)
-
-*Figure 1b — Printer0 (VLAN 30) static configuration (`172.30.99.2/28`, MAC 000A.F391.E959) verified from PC3 (VLAN 20): `ping 172.30.99.2` returns 4/4 replies (TTL 127) with the ARP entry resolved — proving inter-VLAN L2/L3 forwarding from VLAN 20 through gateway `172.30.98.129` (accompanies TEST-03).*
 
 ---
 
