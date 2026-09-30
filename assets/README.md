@@ -15,7 +15,16 @@ Screenshot evidence for the test matrix and the troubleshooting cycle.
 | TEST-05 | `evidence/test-05-guest-block-contractor-1.png` | `ping 172.30.98.2` from Contractor-1 timing out, with `show access-lists 100` hits (ACL 100) |
 | TEST-06 | `evidence/test-06-ssh-pc0.png` | SSHv2 session from PC0 to `172.30.98.1` as `KopanoAdmin`, landing at `Kopano-Edge-R1>` |
 | TEST-07 | `evidence/test-07-dhcp-vlan10-pc0.png` | `ipconfig /all` on PC0 showing valid Admin VLAN 10 lease + DNS `8.8.8.8` |
+| TEST-08 | `evidence/test-08-contractor-dhcp.png` | `ipconfig /all` on Contractor-1 showing relayed lease `172.30.99.18/28`, GW `172.30.99.17`, DHCP server `172.30.98.2` |
+| TEST-09 | `evidence/test-09-dns-resolution.png` | `nslookup google.com` on PC0 resolving via `8.8.8.8`, then `ping google.com` 0% loss (TTL 126) |
 | TEST-10 | `evidence/test-10-contractor-internet.png` | `ping 8.8.8.8` from Contractor-1, 0% loss (contractor Internet while internal stays blocked) |
+
+**Figures:**
+
+| Figure | Filename | Capture |
+| --- | --- | --- |
+| 1a | `evidence/fig-1a-dhcp-server-scopes.png` | DHCP Server GUI (`172.30.98.2`) showing the four scope pools (Admin/Tech/Printer/Contractor) with gateways, DNS `8.8.8.8` and masks |
+| 1b | `evidence/fig-1b-vlan30-printer-verification.png` | Printer0 static `172.30.99.2/28` (MAC 000A.F391.E959) with PC3 `ping 172.30.99.2` 4/4 (TTL 127) + `arp -a` |
 
 ## `faults/` — Troubleshooting Cycle (FLT-01..FLT-03)
 

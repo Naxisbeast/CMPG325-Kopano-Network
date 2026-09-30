@@ -170,6 +170,10 @@ interface GigabitEthernet0/0.40
 
 ```
 
+![Central DHCP server scope pools](../assets/evidence/fig-1a-dhcp-server-scopes.png)
+
+*Figure 1a — The central DHCP server (`172.30.98.2`) holding the four scope pools — AdminScope (VLAN 10), TechScope (VLAN 20), PrinterScope (VLAN 30) and ContractorScope (VLAN 40) — each with its default gateway, DNS `8.8.8.8` and subnet mask.*
+
 ### B. Access Control Lists (ACL Security Policies)
 
 * **ACL 100 (Contractor Isolation):** Applied inbound on `Gi0/0.40`. Contractors on the wireless VLAN keep working DHCP and Internet access, but the ACL denies them any traffic into the internal subnets — the whole Admin/Technical block (`172.30.98.0/23`) and the Printer VLAN (`172.30.99.0/28`).
@@ -278,7 +282,7 @@ ip route 0.0.0.0 0.0.0.0 203.0.113.2
 
 ## 5. Test Evidence & Verification Matrix
 
-I ran each test in Packet Tracer and captured the result (screenshots in [`assets/evidence/`](assets/evidence/)). For the ACL and NAT tests I captured the **PC and the router CLI side-by-side**, so the failing command *and* the matching ACL/NAT counters appear together in one shot. TEST-07 and TEST-10 extend the matrix beyond the core six to prove scoped DHCP on the Admin VLAN and the positive guest-Internet path:
+I ran each test in Packet Tracer and captured the result (screenshots in [`assets/evidence/`](assets/evidence/)). For the ACL and NAT tests I captured the **PC and the router CLI side-by-side**, so the failing command *and* the matching ACL/NAT counters appear together in one shot. TEST-07 through TEST-10 complete the matrix — proving scoped DHCP on the Admin VLAN, relayed DHCP on the contractor wireless VLAN, external DNS resolution, and the positive guest-Internet path:
 
 | Test ID | Test Scenario | Source Device | Target Destination | Protocol / Port | Expected Result | Actual Result / Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -289,7 +293,13 @@ I ran each test in Packet Tracer and captured the result (screenshots in [`asset
 | **TEST-05** | Guest Wi-Fi Internal Block | Contractor-1 (Contractor) | `172.30.98.2` (Admin Server) | IP / ICMP | **FAIL (BLOCK)** | `Request timed out`; `show access-lists 100` shows hits on `deny ip 172.30.99.16 0.0.0.15 172.30.98.0 0.0.1.255` ([Evidence](assets/evidence/test-05-guest-block-contractor-1.png)) |
 | **TEST-06** | Encrypted SSH Management | PC0 (Admin) | `172.30.98.1` (Edge Router) | TCP 22 (SSHv2) | **PASS** | `ssh -l KopanoAdmin` authenticated session established to `Kopano-Edge-R1>` ([Evidence](assets/evidence/test-06-ssh-pc0.png)) |
 | **TEST-07** | Scoped DHCP on Admin *(Additional Scope)* | PC0 (Admin) | Central DHCP Server | UDP 67/68 | **PASS** | Valid Admin lease `172.30.98.x/25` + DNS `8.8.8.8` ([Evidence](assets/evidence/test-07-dhcp-vlan10-pc0.png)) |
+| **TEST-08** | Relayed DHCP on Contractor VLAN | Contractor-1 (Contractor) | Central DHCP Server via `Gi0/0.40` relay | UDP 67/68 | **PASS** | Leased `172.30.99.18/28`, GW `172.30.99.17`, DHCP server `172.30.98.2` ([Evidence](assets/evidence/test-08-contractor-dhcp.png)) |
+| **TEST-09** | Public DNS Resolution | PC0 (Admin) | `google.com` (External DNS) | DNS (UDP 53) / ICMP | **PASS** | `nslookup google.com` resolves via `8.8.8.8`; `ping google.com` 0% loss, TTL 126 ([Evidence](assets/evidence/test-09-dns-resolution.png)) |
 | **TEST-10** | Contractor Internet *(Positive Control)* | Contractor-1 (Contractor) | `8.8.8.8` (Public DNS) | ICMP | **PASS** | 0% Packet Loss — contractors reach the Internet while internal resources stay blocked by ACL 100 ([Evidence](assets/evidence/test-10-contractor-internet.png)) |
+
+![Printer0 static IP and PC3 reachability check](../assets/evidence/fig-1b-vlan30-printer-verification.png)
+
+*Figure 1b — Printer0 (VLAN 30) static configuration (`172.30.99.2/28`, MAC 000A.F391.E959) verified from PC3 (VLAN 20): `ping 172.30.99.2` returns 4/4 replies (TTL 127) with the ARP entry resolved — proving inter-VLAN L2/L3 forwarding from VLAN 20 through gateway `172.30.98.129` (accompanies TEST-03).*
 
 ---
 
