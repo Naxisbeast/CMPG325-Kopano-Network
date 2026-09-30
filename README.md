@@ -170,10 +170,6 @@ interface GigabitEthernet0/0.40
 
 ```
 
-![Central DHCP server scope pools](../assets/evidence/fig-1a-dhcp-server-scopes.png)
-
-*Figure 1a — The central DHCP server (`172.30.98.2`) holding the four scope pools — AdminScope (VLAN 10), TechScope (VLAN 20), PrinterScope (VLAN 30) and ContractorScope (VLAN 40) — each with its default gateway, DNS `8.8.8.8` and subnet mask.*
-
 ### B. Access Control Lists (ACL Security Policies)
 
 * **ACL 100 (Contractor Isolation):** Applied inbound on `Gi0/0.40`. Contractors on the wireless VLAN keep working DHCP and Internet access, but the ACL denies them any traffic into the internal subnets — the whole Admin/Technical block (`172.30.98.0/23`) and the Printer VLAN (`172.30.99.0/28`).
@@ -277,12 +273,6 @@ ip route 0.0.0.0 0.0.0.0 203.0.113.2
 
 * **Symptom:** The contractor laptops couldn't reach anything outside the network.
 * **Resolution:** I reconfigured the WRT300N as a plain Layer 2 access point — moved the uplink from the WAN port to a LAN port, disabled its internal DHCP, and let `Kopano-Core-SW1` handle the 802.1Q tagging on VLAN 40.
-
-### VLAN 30 Shared Printer Configuration and Reachability
-
-![Printer0 static IP and PC3 reachability check](../assets/evidence/fig-1b-vlan30-printer-verification.png)
-
-*Figure 1b — Printer0 (VLAN 30) static configuration (`172.30.99.2/28`, MAC 000A.F391.E959) verified from PC3 (VLAN 20): `ping 172.30.99.2` returns 4/4 replies (TTL 127) with the ARP entry resolved — proving inter-VLAN L2/L3 forwarding from VLAN 20 through gateway `172.30.98.129`.*
 
 ---
 
